@@ -1,0 +1,69 @@
+[project]
+name = "guardrails"
+version = "0.1.0"
+description = "ModernBERT prompt-safety classifier fine-tuned for Apple Silicon"
+readme = "README.md"
+requires-python = ">=3.14"
+authors = [{ name = "Sam McLeod" }]
+license = { text = "MIT" }
+dependencies = [
+    "accelerate>=1.0",
+    "datasets>=3.0",
+    "fastapi>=0.136.0",
+    "httpx>=0.28.1",
+    "numpy>=2.0",
+    "onnx>=1.21.0",
+    "onnxruntime>=1.24.4",
+    "onnxscript>=0.7.0",
+    "pydantic-settings>=2.5",
+    "rich>=13.0",
+    "scikit-learn>=1.5",
+    "socksio>=1.0.0",
+    "torch>=2.8",
+    "transformers>=5.5",
+    "typer>=0.12",
+    "uvicorn[standard]>=0.44.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.7",
+]
+
+[project.scripts]
+guardrails = "guardrails.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/guardrails"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "SIM", "RUF", "TID", "PL"]
+ignore = ["E501", "PLR0913", "PLR2004"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src"]
+pythonVersion = "3.14"
+typeCheckingMode = "off"
+reportMissingTypeStubs = false
+reportArgumentType = false
+reportCallIssue = false
+reportGeneralTypeIssues = false
+reportMissingImports = false

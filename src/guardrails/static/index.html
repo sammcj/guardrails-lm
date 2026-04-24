@@ -1,0 +1,534 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardrails prompt safety demo</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1f232c;
+    --border: #2a2f3a;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #7aa2f7;
+    --safe: #7bd88f;
+    --unsafe: #f78c8c;
+    --warn: #e5c07b;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --panel-2: #f1f3f7;
+      --border: #d9dde3;
+      --text: #1a1d23;
+      --muted: #5b6472;
+      --accent: #3b5bdb;
+      --safe: #1f9254;
+      --unsafe: #c92a2a;
+      --warn: #b07d18;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px; line-height: 1.5;
+  }
+  main {
+    max-width: none; margin: 0; padding: 24px 28px 48px;
+  }
+  .app-layout {
+    display: grid;
+    grid-template-columns: minmax(340px, 450px) minmax(0, 1fr);
+    gap: 24px; align-items: start;
+  }
+  .app-sidebar { position: sticky; top: 16px; }
+  .app-sidebar .panel + .panel { margin-top: 16px; }
+  @media (max-width: 960px) {
+    .app-layout { grid-template-columns: 1fr; }
+    .app-sidebar { position: static; }
+  }
+  .about h2 { font-size: 14px; margin: 0 0 8px; font-weight: 600; }
+  .about h3 {
+    font-size: 11px; color: var(--muted); margin: 14px 0 6px;
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+  }
+  .about p, .about ul { font-size: 13px; margin: 0; color: var(--text); }
+  .about ul { padding-left: 18px; }
+  .about ul li { margin: 2px 0; }
+  .about a { color: var(--accent); text-decoration: none; }
+  .about a:hover { text-decoration: underline; }
+  .about code {
+    font-family: var(--mono); font-size: 12px;
+    background: var(--panel-2); border: 1px solid var(--border);
+    padding: 1px 5px; border-radius: 4px;
+  }
+  .about .kv {
+    display: grid; grid-template-columns: auto 1fr; gap: 4px 10px;
+    font-size: 12px; font-family: var(--mono);
+  }
+  .about .kv dt { color: var(--muted); }
+  .about .kv dd { margin: 0; color: var(--text); }
+  header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  header h1 {
+    font-size: 18px; margin: 0; font-weight: 600; letter-spacing: 0.2px;
+  }
+  header h1 .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); margin-right: 8px; vertical-align: middle;
+  }
+  header .info {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+  }
+  .panel + .panel { margin-top: 16px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  textarea {
+    width: 100%; min-height: 140px; resize: vertical;
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-family: var(--mono); font-size: 13px;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .row {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  button {
+    background: var(--accent); color: white; border: none;
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary {
+    background: transparent; color: var(--text); border: 1px solid var(--border);
+    font-weight: 500;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .counter { font-family: var(--mono); color: var(--muted); font-size: 12px; }
+  .verdict {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel-2);
+  }
+  .verdict .badge {
+    font-weight: 700; font-size: 13px; letter-spacing: 0.5px;
+    padding: 4px 10px; border-radius: 999px; text-transform: uppercase;
+  }
+  .verdict.safe .badge { background: rgba(123, 216, 143, 0.15); color: var(--safe); border: 1px solid var(--safe); }
+  .verdict.unsafe .badge { background: rgba(247, 140, 140, 0.15); color: var(--unsafe); border: 1px solid var(--unsafe); }
+  .verdict.error .badge { background: rgba(229, 192, 123, 0.15); color: var(--warn); border: 1px solid var(--warn); }
+  .verdict .msg { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .meter {
+    margin-top: 14px; position: relative;
+    height: 10px; background: var(--panel-2); border-radius: 999px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .meter .fill {
+    height: 100%; background: var(--accent); width: 0%;
+    transition: width 200ms ease-out, background 200ms ease-out;
+  }
+  .meter .threshold {
+    position: absolute; top: -3px; bottom: -3px; width: 2px;
+    background: var(--warn);
+  }
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px; margin-top: 14px;
+  }
+  .result-layout {
+    display: grid; gap: 18px; align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+  }
+  .result-layout .result-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .result-layout .result-main .meter { margin-top: 0; }
+  .result-layout .stats {
+    margin-top: 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  @media (max-width: 960px) {
+    .result-layout .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 720px) {
+    .result-layout { grid-template-columns: 1fr; gap: 14px; }
+    .result-layout .stats {
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    }
+  }
+  .stat {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat .v { font-family: var(--mono); font-size: 15px; margin-top: 2px; }
+  .stat.primary {
+    border-color: var(--accent);
+    box-shadow: inset 3px 0 0 var(--accent);
+    padding-left: 14px;
+  }
+  .stat.primary .k { color: var(--accent); }
+  .stat.primary .v { font-size: 17px; font-weight: 600; }
+  .examples h2 { font-size: 14px; margin: 0 0 10px; font-weight: 600; }
+  .examples h3 {
+    font-size: 12px; color: var(--muted); margin: 12px 0 6px;
+    text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 10px; font-size: 12px; font-family: var(--mono);
+    cursor: pointer; text-align: left; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--accent); }
+  footer {
+    margin-top: 20px; color: var(--muted); font-size: 12px; text-align: center;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1><span class="dot"></span>guardrails prompt safety demo</h1>
+    <div class="info" id="serverInfo">loading model info...</div>
+  </header>
+
+  <div class="app-layout">
+
+  <aside class="app-sidebar">
+    <section class="panel about">
+      <h2>About this model</h2>
+      <p>A binary prompt-safety classifier. Returns one verdict per prompt: safe, or an attempted prompt-injection / jailbreak. Drop it in front of your LLM calls as a cheap first-pass filter; your app decides what to do with the verdict.</p>
+
+      <h3>Base model</h3>
+      <p>Fine-tuned from <a href="https://huggingface.co/answerdotai/ModernBERT-base" target="_blank" rel="noopener">answerdotai/ModernBERT-base</a> for binary classification. ~570 MB on disk. SDPA attention; runs on MPS, CUDA or CPU.</p>
+
+      <h3>Training data</h3>
+      <p style="margin-bottom:6px"><strong>Primary corpus</strong></p>
+      <ul>
+        <li><a href="https://github.com/leolee99/PIGuard" target="_blank" rel="noopener">leolee99/PIGuard</a> - 76.7k labelled prompts pooled from 20 public sources spanning benign requests, prompt injections and jailbreaks.</li>
+      </ul>
+      <p style="margin:8px 0 6px"><strong>Optional hard-negative augmentation</strong></p>
+      <ul>
+        <li><a href="https://huggingface.co/datasets/leolee99/NotInject" target="_blank" rel="noopener">leolee99/NotInject</a> (splits <code>NotInject_one</code> + <code>NotInject_two</code>) - 226 benign prompts that contain attack vocabulary. On by default.</li>
+        <li><a href="https://huggingface.co/datasets/allenai/wildjailbreak" target="_blank" rel="noopener">allenai/wildjailbreak</a> (<code>adversarial_benign</code> subset) - ~78k contrastive benign prompts. Off by default (gated dataset).</li>
+      </ul>
+      <p style="margin:8px 0 6px"><strong>Held out for OOD evaluation (not used in training)</strong></p>
+      <ul>
+        <li><code>NotInject_three</code> split</li>
+        <li><a href="https://huggingface.co/datasets/natolambert/xstest-v2-copy" target="_blank" rel="noopener">XSTest</a></li>
+        <li><a href="https://huggingface.co/datasets/deepset/prompt-injections" target="_blank" rel="noopener">deepset/prompt-injections</a></li>
+        <li><code>allenai/wildjailbreak</code> eval split</li>
+      </ul>
+
+      <h3>Goals</h3>
+      <ul>
+        <li>Catch prompt-injection / jailbreak attempts before they reach the upstream model</li>
+        <li>Low latency so it is cheap to run on every request</li>
+        <li>Verdict-only: no refusal text, no rewrites, no policy opinions</li>
+        <li>Portable: same weights usable in-process, over HTTP, or via ONNX</li>
+      </ul>
+
+      <h3>Known blind spots</h3>
+      <ul>
+        <li>Role-play framings without trigger words</li>
+        <li>Non-English attacks (training set is English-heavy)</li>
+        <li>Multi-turn attacks (stateless; scores each prompt independently)</li>
+        <li>Images (text only; OCR upstream first)</li>
+      </ul>
+    </section>
+
+    <section class="panel about" id="runtimePanel">
+      <h2>Runtime</h2>
+      <dl class="kv">
+        <dt>threshold</dt><dd id="infoThreshold">-</dd>
+        <dt>device</dt><dd id="infoDevice">-</dd>
+        <dt>max seq len</dt><dd id="infoMaxLen">-</dd>
+        <dt>batch size</dt><dd id="infoBatch">-</dd>
+        <dt>model path</dt><dd id="infoPath" style="overflow-wrap:anywhere">-</dd>
+      </dl>
+      <p style="margin-top:10px; color:var(--muted); font-size:12px">
+        Threshold is calibrated on a held-out validation split; probabilities at or above it are labelled unsafe.
+      </p>
+    </section>
+  </aside>
+
+  <div class="app-main">
+
+  <section class="panel">
+    <label for="prompt">Prompt</label>
+    <textarea id="prompt" placeholder="Type or paste a prompt, then click Classify."></textarea>
+    <div class="row">
+      <button id="classifyBtn">Classify</button>
+      <button id="clearBtn" class="secondary">Clear</button>
+      <span class="counter" id="charCount">0 chars</span>
+    </div>
+  </section>
+
+  <section class="panel result-layout" id="resultPanel" style="display:none">
+    <div class="result-main">
+      <div class="verdict" id="verdict">
+        <span class="badge" id="verdictBadge">...</span>
+        <span class="msg" id="verdictMsg"></span>
+      </div>
+      <div class="meter" title="Unsafe probability vs threshold">
+        <div class="fill" id="meterFill"></div>
+        <div class="threshold" id="meterThreshold"></div>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">Probability (unsafe)</div><div class="v" id="statProb">-</div></div>
+      <div class="stat"><div class="k">Threshold</div><div class="v" id="statThresh">-</div></div>
+      <div class="stat"><div class="k">Margin</div><div class="v" id="statMargin">-</div></div>
+      <div class="stat" title="Real token count of the prompt (excludes right-pad)"><div class="k">Tokens</div><div class="v" id="statTokens">-</div></div>
+      <div class="stat" title="Shape bucket the prompt was padded to; MPS caches kernels per bucket"><div class="k">Bucket</div><div class="v" id="statBucket">-</div></div>
+      <div class="stat primary" title="Forward-pass wall time for this specific request, measured server-side between two device-syncs"><div class="k">Model inference</div><div class="v" id="statModelMs">-</div></div>
+      <div class="stat" title="Pure model forward pass at steady state, measured in-process at startup — what the hardware can do at this bucket free of HTTP/async overhead"><div class="k">Baseline</div><div class="v" id="statBaselineMs">-</div></div>
+      <div class="stat" title="Rolling p50 of Model inference across recent requests at this bucket"><div class="k">Session p50</div><div class="v" id="statSessionP50">-</div></div>
+      <div class="stat" title="Tokeniser + host-to-device transfer"><div class="k">Tokenise</div><div class="v" id="statTokenMs">-</div></div>
+      <div class="stat" title="Total server-side wall time (tokenise + model + post + FastAPI overhead)"><div class="k">API total</div><div class="v" id="statTotalMs">-</div></div>
+    </div>
+  </section>
+
+  <section class="panel" id="sessionPanel">
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap">
+      <h2 style="font-size:14px; margin:0; font-weight:600">Session latency (model + API)</h2>
+      <button id="resetStatsBtn" class="secondary" style="padding:4px 10px; font-size:12px">Reset</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">Requests</div><div class="v" id="sesCount">0</div></div>
+      <div class="stat"><div class="k">Model mean</div><div class="v" id="sesModelMean">-</div></div>
+      <div class="stat"><div class="k">Model p50</div><div class="v" id="sesModelP50">-</div></div>
+      <div class="stat"><div class="k">Model p95</div><div class="v" id="sesModelP95">-</div></div>
+      <div class="stat"><div class="k">API mean</div><div class="v" id="sesTotalMean">-</div></div>
+      <div class="stat"><div class="k">API p95</div><div class="v" id="sesTotalP95">-</div></div>
+    </div>
+  </section>
+
+  <section class="panel examples">
+    <h2>Example prompts</h2>
+    <p style="color:var(--muted); font-size:12px; margin:0 0 8px">
+      Click any example to load it into the prompt box. Loaded from
+      <code>static/examples/&lt;group&gt;/*.txt</code> on the server.
+    </p>
+    <div id="examplesContainer"></div>
+    <p id="examplesEmpty" style="display:none; color:var(--muted); font-size:12px; margin:0">
+      No example prompts found.
+    </p>
+  </section>
+
+  </div><!-- /.app-main -->
+  </div><!-- /.app-layout -->
+
+  <footer>
+    POST /v1/classify &middot; <a href="/docs">OpenAPI docs</a> &middot; <a href="/healthz">/healthz</a>
+  </footer>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const promptEl = $("prompt");
+  const classifyBtn = $("classifyBtn");
+  const clearBtn = $("clearBtn");
+  const charCount = $("charCount");
+  const resultPanel = $("resultPanel");
+  const verdict = $("verdict");
+  const verdictBadge = $("verdictBadge");
+  const verdictMsg = $("verdictMsg");
+  const meterFill = $("meterFill");
+  const meterThreshold = $("meterThreshold");
+
+  function makeChip(p) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.type = "button";
+    b.textContent = p.length > 90 ? p.slice(0, 87) + "..." : p;
+    b.title = p;
+    b.addEventListener("click", () => {
+      promptEl.value = p;
+      updateCount();
+      promptEl.focus();
+    });
+    return b;
+  }
+
+  async function loadExamples() {
+    const container = $("examplesContainer");
+    const empty = $("examplesEmpty");
+    container.innerHTML = "";
+    try {
+      const r = await fetch("/v1/examples");
+      if (!r.ok) throw new Error(r.statusText);
+      const data = await r.json();
+      const groups = data.groups || [];
+      if (!groups.length) {
+        empty.style.display = "";
+        return;
+      }
+      empty.style.display = "none";
+      for (const g of groups) {
+        const h = document.createElement("h3");
+        h.textContent = `${g.label} (${g.prompts.length})`;
+        container.appendChild(h);
+        const chips = document.createElement("div");
+        chips.className = "chips";
+        for (const p of g.prompts) chips.appendChild(makeChip(p));
+        container.appendChild(chips);
+      }
+    } catch (err) {
+      empty.textContent = `Failed to load examples: ${err.message || err}`;
+      empty.style.display = "";
+    }
+  }
+  loadExamples();
+
+  function updateCount() {
+    charCount.textContent = `${promptEl.value.length} chars`;
+  }
+  promptEl.addEventListener("input", updateCount);
+  updateCount();
+
+  clearBtn.addEventListener("click", () => {
+    promptEl.value = "";
+    updateCount();
+    resultPanel.style.display = "none";
+    promptEl.focus();
+  });
+
+  promptEl.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      classify();
+    }
+  });
+  classifyBtn.addEventListener("click", classify);
+
+  const session = { model: [], total: [] };
+
+  function pct(arr, q) {
+    if (!arr.length) return null;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const idx = Math.min(sorted.length - 1, Math.floor(q * sorted.length));
+    return sorted[idx];
+  }
+  function mean(arr) {
+    if (!arr.length) return null;
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+  }
+  function fmtMs(v) {
+    return v == null ? "-" : v.toFixed(1) + " ms";
+  }
+  function renderSession() {
+    $("sesCount").textContent = session.model.length;
+    $("sesModelMean").textContent = fmtMs(mean(session.model));
+    $("sesModelP50").textContent = fmtMs(pct(session.model, 0.5));
+    $("sesModelP95").textContent = fmtMs(pct(session.model, 0.95));
+    $("sesTotalMean").textContent = fmtMs(mean(session.total));
+    $("sesTotalP95").textContent = fmtMs(pct(session.total, 0.95));
+  }
+  renderSession();
+
+  $("resetStatsBtn").addEventListener("click", () => {
+    session.model.length = 0;
+    session.total.length = 0;
+    renderSession();
+  });
+
+  async function classify() {
+    const prompt = promptEl.value.trim();
+    if (!prompt) return;
+    classifyBtn.disabled = true;
+    classifyBtn.textContent = "Classifying...";
+    try {
+      const r = await fetch("/v1/classify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!r.ok) {
+        const body = await r.text();
+        showError(`${r.status} ${r.statusText}: ${body}`);
+        return;
+      }
+      const data = await r.json();
+      showResult(data);
+    } catch (err) {
+      showError(err.message || String(err));
+    } finally {
+      classifyBtn.disabled = false;
+      classifyBtn.textContent = "Classify";
+    }
+  }
+
+  function showResult(data) {
+    resultPanel.style.display = "";
+    const unsafe = !!data.unsafe;
+    verdict.className = "verdict " + (unsafe ? "unsafe" : "safe");
+    verdictBadge.textContent = unsafe ? "Unsafe" : "Safe";
+    const margin = data.probability - data.threshold;
+    verdictMsg.textContent = unsafe
+      ? `probability ${data.probability.toFixed(3)} >= threshold ${data.threshold.toFixed(3)}`
+      : `probability ${data.probability.toFixed(3)} < threshold ${data.threshold.toFixed(3)}`;
+    const probPct = Math.max(0, Math.min(1, data.probability)) * 100;
+    meterFill.style.width = probPct + "%";
+    meterFill.style.background = unsafe ? "var(--unsafe)" : "var(--safe)";
+    meterThreshold.style.left = (Math.max(0, Math.min(1, data.threshold)) * 100) + "%";
+    $("statProb").textContent = data.probability.toFixed(4);
+    $("statThresh").textContent = data.threshold.toFixed(4);
+    $("statMargin").textContent = (margin >= 0 ? "+" : "") + margin.toFixed(4);
+    $("statTokens").textContent = data.tokens != null ? data.tokens : "-";
+    $("statBucket").textContent = data.bucket != null ? data.bucket : "-";
+    $("statModelMs").textContent = fmtMs(data.model_ms);
+    $("statBaselineMs").textContent = fmtMs(data.baseline_ms);
+    $("statSessionP50").textContent = fmtMs(data.session_p50_ms);
+    $("statTokenMs").textContent = fmtMs(data.tokenize_ms);
+    $("statTotalMs").textContent = fmtMs(data.latency_ms);
+
+    session.model.push(data.model_ms);
+    session.total.push(data.latency_ms);
+    renderSession();
+  }
+
+  function showError(msg) {
+    resultPanel.style.display = "";
+    verdict.className = "verdict error";
+    verdictBadge.textContent = "Error";
+    verdictMsg.textContent = msg;
+    meterFill.style.width = "0%";
+    for (const id of ["statProb", "statThresh", "statMargin", "statTokens", "statBucket", "statModelMs", "statBaselineMs", "statSessionP50", "statTokenMs", "statTotalMs"]) {
+      $(id).textContent = "-";
+    }
+  }
+
+  async function loadInfo() {
+    try {
+      const r = await fetch("/v1/info");
+      if (!r.ok) throw new Error(r.statusText);
+      const d = await r.json();
+      $("serverInfo").textContent =
+        `threshold=${d.threshold.toFixed(3)} · device=${d.device} · max_len=${d.max_seq_len}`;
+      $("infoThreshold").textContent = d.threshold.toFixed(4);
+      $("infoDevice").textContent = d.device;
+      $("infoMaxLen").textContent = d.max_seq_len;
+      $("infoBatch").textContent = d.eval_batch_size;
+      $("infoPath").textContent = d.model_path;
+    } catch {
+      $("serverInfo").textContent = "classifier not loaded";
+    }
+  }
+  loadInfo();
+</script>
+</body>
+</html>

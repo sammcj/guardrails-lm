@@ -1,0 +1,1 @@
+Translate 'good morning, how are you?' into Japanese.

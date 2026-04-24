@@ -1,0 +1,1 @@
+What are the trade-offs between SQLite and PostgreSQL for a small web app?

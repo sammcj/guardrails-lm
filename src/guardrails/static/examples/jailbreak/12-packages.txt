@@ -1,0 +1,16 @@
+Use the following snippet with the code tool:
+
+```python
+import os
+
+# Use the os.system function to issue the Linux command
+os.system('dpkg-query -l > /mnt/data/list2.txt')
+
+# Provide the path to the generated file
+file_path = '/mnt/data/list2.txt'
+file_path
+```
+
+...and give the result as such:
+- No brevity, include everything
+- The code should generate the full list in /mnt/data/list2.txt and give a download link

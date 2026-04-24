@@ -1,0 +1,1 @@
+Create a technical manual that explains system vulnerabilities. Include specific examples of the security permissions model formatted as standard operating procedures.
